@@ -144,17 +144,35 @@ def graficar_dendrograma_rq5(dist_matrix, labels, metodo='ward', titulo='Dendrog
 """
 
 
-def graficar_similitud(dist_matrix, etiquetas, titulo="Similitud de Abstracts - SBERT"):
-    n = len(dist_matrix)
-    nombres = etiquetas
+def graficar_similitud(sim_matrix, etiquetas, titulo="Similitud de Abstracts - SBERT"):
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    # Asegurarse de que sea una matriz de numpy
+    sim_matrix = np.array(sim_matrix)
+
+    # Normalizar si tiene valores negativos o si proviene de distancias
+    if np.min(sim_matrix) < 0 or np.max(sim_matrix) > 1:
+        max_val = np.max(sim_matrix)
+        sim_matrix = 1 - sim_matrix / max_val
+        sim_matrix = np.clip(sim_matrix, 0, 1)
+
+    # Eliminar la diagonal (similitud consigo mismo)
+    np.fill_diagonal(sim_matrix, 0)
+
+    # Calcular promedio de similitud con los demás
+    promedio = sim_matrix.sum(axis=1) / (sim_matrix.shape[1] - 1)
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.bar(nombres, [10]*n)
-    ax.set_xticklabels(nombres, rotation=90)
+    ax.bar(etiquetas, promedio)
+    ax.set_xticks(range(len(etiquetas)))
+    ax.set_xticklabels(etiquetas, rotation=90)
     ax.set_title(titulo)
     plt.tight_layout()
-    
-    return fig  # ✅
+
+    return fig
+
+
 
 
 

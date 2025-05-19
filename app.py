@@ -1,3 +1,4 @@
+import numpy as np
 import streamlit as st
 import os
 import shutil
@@ -10,7 +11,7 @@ from domain.agrupamiento.similitud import calcular_matriz_similitud
 from domain.metodos_ordenamiento import *
 from domain.metodos_ordenamiento.binary_insertion_sort import BinaryInsertionSort
 from domain.requerimientos import requerimiento2, requerimiento3, requerimiento5
-from domain.utils import graficar_heatmap_similitud, graficar_similitud, leer_bibtex, normalize_data, save_bibtex, buscar_duplicados
+from domain.utils import graficar_dendrograma_rq5, graficar_heatmap_similitud, graficar_similitud, leer_bibtex, normalize_data, save_bibtex, buscar_duplicados
 from main import ejecutar_req_2_y_3
 
 # Configuración inicial
@@ -49,7 +50,7 @@ if uploaded_files:
 
     # --- Requerimientos 1 al 3 ---
     if opcion == "Requerimientos 1 al 3 (ordenamiento y análisis)":
-        num_articulos = st.slider("Cantidad máxima de artículos a analizar", 5, 5000, 10)
+        # num_articulos = st.slider("Cantidad máxima de artículos a analizar", 5, 5000, 10)
         
         if st.button("Ejecutar Requerimientos 1 al 3"):
             try:
@@ -154,7 +155,7 @@ if uploaded_files:
                     # r3.generar_grafico_coocurrencia()  # opcional
                     # r3.guardar_csv_frecuencias()       # opcional
 
-                    wordcloud_path = os.path.join("imagenes", "salidas", "nube_general.png")  # 🔄 CAMBIADO
+                    wordcloud_path = os.path.join("imagenes", "salidas", "nube_general.png")  
 
                     if os.path.exists(wordcloud_path):
                         st.image(wordcloud_path)
@@ -276,44 +277,61 @@ if uploaded_files:
 
     # --- Requerimiento 5 ---
     elif opcion == "Requerimiento 5 (similitud con SBERT)":
-        st.subheader("🧠 Análisis de Similitud de Abstracts con SBERT")
+            st.subheader("🧠 Análisis de Similitud de Abstracts con SBERT")
 
-        if st.button("Ejecutar Requerimiento 5"):
-            try:
-                ruta_bibtex = "articulos_unificados.bib"  # Ajusta si necesitas ruta dinámica
+            if st.button("Ejecutar Requerimiento 5"):
+                try:
+                    import numpy as np
+                    from scipy.spatial.distance import squareform
 
-                if not os.path.exists(ruta_bibtex):
-                    st.error("❌ El archivo .bib no existe.")
-                else:
-                    entries = leer_bibtex(ruta_bibtex)
-                    data = normalize_data(entries)
-                    data = [d for d in data if d['abstract']]
-                    data = data[:50]  # Limitar a 50 abstracts
+                    ruta_bibtex = "articulos_unificados.bib"  # Ajusta si necesitas ruta dinámica
 
-                    if len(data) < 2:
-                        st.warning("❌ No hay suficientes abstracts válidos para comparar.")
+                    if not os.path.exists(ruta_bibtex):
+                        st.error("❌ El archivo .bib no existe.")
                     else:
-                        abstracts = [item['abstract'] for item in data]
-                        etiquetas = [f"Abstract {i+1}" for i in range(len(abstracts))]
+                        entries = leer_bibtex(ruta_bibtex)
+                        data = normalize_data(entries)
+                        data = [d for d in data if d['abstract']]
+                        data = data[:50]  # Limitar a 50 abstracts
 
-                        st.info("✅ Calculando similitud con SBERT...")
+                        if len(data) < 2:
+                            st.warning("❌ No hay suficientes abstracts válidos para comparar.")
+                        else:
+                            abstracts = [item['abstract'] for item in data]
+                            etiquetas = [f"Abstract {i+1}" for i in range(len(abstracts))]
 
-                        # Calcular matriz de similitud
-                        sim_matrix_sbert = requerimiento5.calcular_similitud_sbert(abstracts)
+                            st.info("✅ Calculando similitud con SBERT...")
 
-                        # Mostrar heatmap
-                        fig_heatmap = graficar_heatmap_similitud(sim_matrix_sbert)
-                        st.pyplot(fig_heatmap)
+                            # Calcular matriz de similitud
+                            sim_matrix_sbert = requerimiento5.calcular_similitud_sbert(abstracts)
 
-                        # Mostrar gráfico de similitud
-                        fig_similitud = graficar_similitud(sim_matrix_sbert, etiquetas, "Gráfico de Similitud - SBERT")
-                        st.pyplot(fig_similitud)
+                            # Mostrar heatmap
+                            fig_heatmap = graficar_heatmap_similitud(sim_matrix_sbert)
+                            st.pyplot(fig_heatmap)
 
-                        st.success("✅ Análisis de similitud completado exitosamente!")
+                            # Mostrar gráfico de similitud
+                            fig_similitud = graficar_similitud(sim_matrix_sbert, etiquetas, "Gráfico de Similitud - SBERT")
+                            st.pyplot(fig_similitud)
 
-            except Exception as e:
-                st.error(f"❌ Error durante el análisis de similitud: {str(e)}")
-                st.exception(e)
+                            # Convertir matriz de similitud a distancia
+                            sim_matrix_sbert = np.array(sim_matrix_sbert)
+                            dist_matrix = 1 - sim_matrix_sbert
+                            np.fill_diagonal(dist_matrix, 0)
+                            dist_matrix = (dist_matrix + dist_matrix.T) / 2  # Asegurar simetría
+
+                            # Verificar que es válida para squareform
+                            try:
+                                squareform(dist_matrix)  # Solo para validar
+                                fig_dendro_sbert = graficar_dendrograma_rq5(dist_matrix, etiquetas, titulo="Dendrograma - Similitud SBERT")
+                                st.pyplot(fig_dendro_sbert)
+                            except ValueError as ve:
+                                st.error(f"❌ Error generando el dendrograma: {ve}")
+
+                            st.success("✅ Análisis de similitud completado exitosamente!")
+
+                except Exception as e:
+                    st.error(f"❌ Error durante el análisis de similitud: {str(e)}")
+                    st.exception(e)
 
 
 
